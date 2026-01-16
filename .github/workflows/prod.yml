@@ -1,6 +1,5 @@
 name: Container deployment (Prod)
 
-
 on:
   push:
     branches:
@@ -12,17 +11,17 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v2
         with:
-            fetch-depth: 0
-      
+          fetch-depth: 0
+
       - name: Set up docker
         uses: docker/docker-login-action@v2
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
-        
+
       - name: Setup Dokcer BuildX
         uses: docker/setup-buildx-action@v2
-      
+
       - name: Build and push Image
         uses: docker/build-push-action@v3
         with:
@@ -31,4 +30,18 @@ jobs:
           push: true
           tags: ${{ secrets.DOCKER_USERNAME }}/argo-app:${{ github.sha }}
 
-     
+      ## Automatically added the new changes to the deployment file and apply the changes to the cluster
+      - name: Cloneing the ops repo
+        env:
+          PAT: ${{ secrets.PAT }}
+        run: |
+          git clone https://github.com/coderrahul-cyber/ArgoCd-ops.git
+          cd ArgoCd-ops
+
+          sed -i 's|image: '"${{ secrets.DOCKER_USERNAME }}"'/argo-app:.*|image: '"${{ secrets.DOCKER_USERNAME }}"'/argo-app:'"${{ github.sha }}"'|' manifest.yml
+
+          git config  user.name "github-bot"
+          git config  user.email "action@github.com"
+          git add .
+          git commit -m "Updating the deployment image to ${{ github.sha }}"
+          git push https://${{secrets.PAT}}@github.com/coderrahul-cyber/ArgoCd-ops.git main
